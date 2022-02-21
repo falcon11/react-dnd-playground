@@ -37,6 +37,38 @@ const Components = [
   },
 ];
 
+function findComponentParent(
+  component: ComponentInstance,
+  rootComponent: ComponentInstance
+): ComponentInstance | null {
+  let parent: ComponentInstance | null = rootComponent;
+  if (parent && parent.children && parent.children?.length > 0) {
+    if (parent.children.some((child) => child.id === component.id)) {
+      return parent;
+    }
+    for (let i = 0; i < parent!.children!.length; i++) {
+      let nextParent: ComponentInstance | null = parent!.children![i];
+      nextParent = findComponentParent(component, nextParent);
+      if (nextParent) {
+        return nextParent;
+      }
+    }
+  }
+  return null;
+}
+
+function removeComponent(
+  component: ComponentInstance,
+  rootCompnent: ComponentInstance
+) {
+  const parent = findComponentParent(component, rootCompnent);
+  if (parent && Array.isArray(parent.children)) {
+    parent.children = parent.children!.filter(
+      (child) => child.id !== component.id
+    );
+  }
+}
+
 interface EditorProps {}
 
 const Editor: FC<EditorProps> = () => {
@@ -51,6 +83,7 @@ const Editor: FC<EditorProps> = () => {
     sourceItem: ComponentClass & ComponentInstance,
     targetItem: ComponentInstance
   ) => {
+    console.log('moveComponent', sourceItem, targetItem);
     let component = sourceItem;
     if (!component.id) {
       component = JSON.parse(JSON.stringify(component));
@@ -58,12 +91,14 @@ const Editor: FC<EditorProps> = () => {
     }
     targetItem.children = targetItem.children || [];
     if (targetItem.children?.findIndex((it) => it.id === component.id) === -1) {
+      removeComponent(component, rootCompnent);
       targetItem.children = [...targetItem.children, component];
     }
-    setRootComponent({ ...rootCompnent });
+    console.log('root Components', rootCompnent);
+    setRootComponent(JSON.parse(JSON.stringify(rootCompnent)));
   };
   const [{ isOver }, drop] = useDrop<
-    Partial<ComponentClass & ComponentInstance>,
+    ComponentClass & ComponentInstance,
     void,
     { isOver: boolean }
   >(() => {
@@ -71,33 +106,9 @@ const Editor: FC<EditorProps> = () => {
       accept: [ItemTypes.COMPONENT_CLASS, ItemTypes.COMPONENT_INSTANCE],
       drop: (item, monitor) => {
         if (monitor.didDrop()) return;
-        console.log('drop', item);
-        let component = item;
-        if (!component.id) {
-          component = JSON.parse(JSON.stringify(component));
-          component.id = uuidv4();
-        }
-        if (
-          rootCompnent.children!.findIndex((it) => it.id === component.id) ===
-          -1
-        ) {
-          setRootComponent((preRootComponent) => {
-            if (
-              preRootComponent.children!.findIndex(
-                (it) => it.id === component.id
-              ) === -1
-            ) {
-              return {
-                ...preRootComponent,
-                children: [
-                  ...preRootComponent.children!,
-                  component as ComponentInstance,
-                ],
-              };
-            }
-            return preRootComponent;
-          });
-        }
+        console.log('drop item', item);
+        moveComponent(item, rootCompnent);
+        return;
       },
       hover: (item) => {
         console.log('hover', item);
@@ -106,7 +117,7 @@ const Editor: FC<EditorProps> = () => {
         return { isOver: monitor.isOver({ shallow: true }) };
       },
     };
-  });
+  }, [rootCompnent]);
 
   return (
     <div style={{ ...pageStyle }}>
@@ -145,22 +156,11 @@ const Editor: FC<EditorProps> = () => {
       >
         {rootCompnent.children!.map((component) => {
           return (
-            <DndWrapper
+            <ComponentRender
               key={component.id}
-              item={component}
-              type={ItemTypes.COMPONENT_INSTANCE}
-              accept={[ItemTypes.COMPONENT_CLASS, ItemTypes.COMPONENT_INSTANCE]}
-              onDrop={(item) => {
-                moveComponent(item, component);
-              }}
-              render={({ item }) => {
-                return (
-                  <ComponentRender
-                    component={item}
-                    basePath={ComponentsBasePath}
-                  />
-                );
-              }}
+              component={component}
+              basePath={ComponentsBasePath}
+              moveComponent={moveComponent}
             />
           );
         })}

@@ -42,9 +42,8 @@ const DndWrapper: FC<DndWrapperProps> = ({
       canDrop: () => item.isContainer,
       drop: (dragItem: any, monitor) => {
         if (monitor.didDrop()) return;
-        console.log('drop', dragItem);
         if (dragItem.id === item.id) return;
-        onDrop && onDrop(item);
+        onDrop && onDrop(dragItem);
       },
       hover: (item) => {
         console.log('hover', item);
@@ -56,7 +55,7 @@ const DndWrapper: FC<DndWrapperProps> = ({
         };
       },
     };
-  });
+  }, [item]);
   drag(drop(ref));
   return (
     <div
